@@ -1,0 +1,52 @@
+# A single mono-scoped cell: one skill, completed end to end.
+apiVersion: skillcell.dev/v1alpha1
+kind: Cell
+metadata:
+  name: firmware-triage
+  labels:
+    domain: security
+spec:
+  scope: "Triage router firmware images end to end (from reverse-skill/firmware-pentest)."
+
+  runtime: container          # local | container
+  container:
+    devcontainer: ./.devcontainer/devcontainer.json
+
+  contract:
+    inputs:
+      - name: image
+        type: file            # firmware blob
+      - name: authorization
+        type: doc             # scope/authorization gate, required before act mode
+    outputs:
+      - name: report
+        type: markdown
+      - name: findings
+        type: json
+    eval:
+      gate: ./eval/run.sh      # must exit 0 before the cell reports done
+      coverageFloor: 0.80
+
+  tools:                       # exact allowlist; nothing else reachable
+    - binwalk
+    - unblob
+    - read_file
+    - write_file
+  network: deny                # deny | allowlist | open
+
+  lsp:
+    - server: pyright
+      root: .
+
+  loop:
+    stages: [align, review, select, gate, act, record, stop]
+    maxIterations: 12
+    stopOn: decisionBoundary
+
+  model:
+    base: qwen2.5-coder-7b     # frozen base
+    adapter: firmware-triage@v3  # LoRA adapter from the registry; omit for hosted fallback
+    decode:
+      temperature: 0.0
+      seed: 1
+    # fallback: hosted:claude   # used when no adapter is promoted yet

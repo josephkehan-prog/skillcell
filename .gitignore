@@ -1,0 +1,11 @@
+# runtime + provisioner output
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.worktrees/
+runs/
+artifacts/
+*.adapter
+*.safetensors
+.DS_Store

@@ -1,0 +1,47 @@
+# A DAG of cells composed into a larger capability, reconciled by the orchestrator.
+apiVersion: skillcell.dev/v1alpha1
+kind: Chain
+metadata:
+  name: firmware-audit-report
+spec:
+  # Typed artifact edges wire one cell's output into the next cell's input.
+  nodes:
+    - cell: firmware-triage
+      as: triage
+    - cell: cve-correlate          # maps triage findings to known CVEs
+      as: correlate
+      inputs:
+        findings: ${triage.outputs.findings}
+    - cell: report-writer          # renders the operator-facing report
+      as: writer
+      inputs:
+        findings: ${correlate.outputs.findings}
+        triageReport: ${triage.outputs.report}
+
+  edges:
+    - from: triage
+      to: correlate
+    - from: correlate
+      to: writer
+
+  policy:
+    retry:
+      max: 2
+      backoff: exponential
+    onOverload: fallbackTier        # opus -> sonnet -> haiku, or drop adapter -> hosted
+    onGateFail: park                # stop and surface for operator decision
+---
+# One execution of the chain. The orchestrator reconciles this to completion.
+apiVersion: skillcell.dev/v1alpha1
+kind: Run
+metadata:
+  name: audit-2026-08-02-router-x
+spec:
+  chain: firmware-audit-report
+  runtime: local                    # local | kube
+  inputs:
+    image: ./samples/router-x.bin
+    authorization: ./auth/engagement-1042.md
+  record:
+    transcript: true                # full iteration record, resumable + auditable
+    artifactStore: oci://registry.local/skillcell
