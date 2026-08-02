@@ -18,6 +18,7 @@ uv run bandit -c pyproject.toml -r src   # security scan
 uv run skillcell doctor                  # runtime readiness check
 uv run skillcell validate examples/chain.yaml   # validate a Cell or Chain manifest
 uv run skillcell run examples/cell.yaml --goal "triage firmware image" --json
+uv run skillcell tui examples             # terminal UI (needs the 'tui' extra; dev group has it)
 ```
 
 `skillcell run` flags: `--goal` (required), `--act` (request act mode), `--authorized` (satisfies the authorization gate), `--json`.
@@ -35,7 +36,8 @@ Data flows: CLI → manifest → loop, with router and model as pluggable callab
 - `router.py` — deterministic keyword routing (order-stable tuple of rules → specialist name, `generalist` fallback). Determinism here is a contract, not an implementation detail: same goal must always select the same route.
 - `model.py` — the model plane: four backends behind one `complete(prompt)` interface — `offline` (echo transport, exercises the plane with no network), `frontier` (Anthropic), `system` (local endpoint), `byok`. **API keys come from the environment by convention, never from the manifest**: `ANTHROPIC_API_KEY`, `SKILLCELL_SYSTEM_ENDPOINT`, `SKILLCELL_BYOK_KEY`.
 - `evalgate.py` — the eval gate a cell must pass before reporting done.
-- `cli.py` — `doctor`, `run`, and `validate` subcommands; exit 2 on manifest errors.
+- `cli.py` — `doctor`, `run`, `validate`, and `tui` subcommands; exit 2 on manifest errors.
+- `tui.py` — Textual app (optional `tui` extra): manifest list + detail pane, validates on select, `r` runs a Cell's offline loop. Takes `manifest_dir` in the constructor so tests drive it headless via `app.run_test()`; keep it constructor-injected, no cwd reads.
 
 ## Constraints
 

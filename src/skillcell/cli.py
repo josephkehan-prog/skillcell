@@ -37,6 +37,19 @@ def _cmd_validate(ns: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_tui(ns: argparse.Namespace) -> int:  # pragma: no cover - interactive
+    try:
+        from .tui import run_tui
+    except ModuleNotFoundError:
+        print(
+            "error: the TUI requires the 'tui' extra — install with: pip install skillcell[tui]",
+            file=sys.stderr,
+        )
+        return 2
+    run_tui(ns.dir)
+    return 0
+
+
 def _cmd_run(ns: argparse.Namespace) -> int:
     try:
         cell = load_cell(ns.manifest)
@@ -101,6 +114,10 @@ def build_parser() -> argparse.ArgumentParser:
     v = sub.add_parser("validate", help="validate a manifest (Cell or Chain)")
     v.add_argument("manifest", help="path to a manifest")
     v.set_defaults(func=_cmd_validate)
+
+    t = sub.add_parser("tui", help="browse and run manifests in a terminal UI")
+    t.add_argument("dir", nargs="?", default=".", help="manifest directory (default: cwd)")
+    t.set_defaults(func=_cmd_tui)
     return p
 
 

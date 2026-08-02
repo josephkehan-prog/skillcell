@@ -91,6 +91,7 @@ uv sync
 uv run skillcell doctor
 uv run skillcell validate examples/refactor-audit-chain.yaml
 uv run skillcell run examples/cell.yaml --goal "triage firmware image" --json
+uv run skillcell tui examples   # terminal UI: pip install 'skillcell[tui]'
 ```
 
 Offline by default: with no `model` in the manifest, the loop aligns, routes,
