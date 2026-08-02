@@ -40,6 +40,11 @@ class ModelSpec:
 
 
 @dataclass(frozen=True)
+class ContainerCfg:
+    devcontainer: str
+
+
+@dataclass(frozen=True)
 class Cell:
     name: str
     scope: str
@@ -49,6 +54,7 @@ class Cell:
     model: ModelSpec | None = None
     tools: tuple[str, ...] = ()
     network: str = "deny"
+    container: ContainerCfg | None = None
 
 
 @dataclass(frozen=True)
@@ -133,6 +139,12 @@ def _cell_from_doc(doc: dict[str, Any]) -> Cell:
     if spec.get("model"):
         model = _parse_model(spec["model"])
 
+    container = None
+    if spec.get("container"):
+        container = ContainerCfg(
+            devcontainer=str(_require(spec["container"], "devcontainer", "spec.container"))
+        )
+
     return Cell(
         name=name,
         scope=str(scope),
@@ -142,6 +154,7 @@ def _cell_from_doc(doc: dict[str, Any]) -> Cell:
         model=model,
         tools=tuple(spec.get("tools") or ()),
         network=str(spec.get("network", "deny")),
+        container=container,
     )
 
 
