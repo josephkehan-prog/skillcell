@@ -16,4 +16,5 @@ dist/
 .coverage
 *.egg-info/
 uv.lock
-.claude/
+.claude/*
+!.claude/skills/
