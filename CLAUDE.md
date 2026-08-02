@@ -16,6 +16,7 @@ uv run ruff check src tests             # lint (E,F,I,UP,B,SIM; line-length 100)
 uv run mypy                              # strict typing, src/ only
 uv run bandit -c pyproject.toml -r src   # security scan
 uv run skillcell doctor                  # runtime readiness check
+uv run skillcell validate examples/chain.yaml   # validate a Cell or Chain manifest
 uv run skillcell run examples/cell.yaml --goal "triage firmware image" --json
 ```
 
@@ -29,12 +30,12 @@ Phase 0 of an "agent-into-cell" system: instead of loading skills into one agent
 
 Data flows: CLI → manifest → loop, with router and model as pluggable callables the loop receives.
 
-- `manifest.py` — parses/validates CRD-shaped YAML (`apiVersion: skillcell.dev/v1alpha1`, `kind: Cell`). The manifest is the single source of truth for a cell: scope, contract (inputs/outputs/eval gate), tool allowlist, network policy, loop config, model spec. See `examples/cell.yaml` for the full shape.
+- `manifest.py` — parses/validates CRD-shaped YAML (`apiVersion: skillcell.dev/v1alpha1`). Loads both `kind: Cell` (`load_cell`) and `kind: Chain` (`load_chain`, reads the first YAML document, validates edge and `${alias.outputs.x}` input refs against declared node aliases). The Cell manifest is the single source of truth for a cell: scope, contract (inputs/outputs/eval gate), tool allowlist, network policy, loop config, model spec. See `examples/cell.yaml` for the full Cell shape and `examples/chain.yaml` for the Chain shape.
 - `loop.py` — the seven-stage in-cell loop: `align, review, select, gate, act, record, stop`. **Offline-first is the core invariant**: with no backend the loop still aligns, routes, gates, records, and stops with `act` marked `skipped`. Act mode additionally requires the authorization gate. Takes `Router` and `Backend` as plain callables (`Callable[[str], str]`) — keep that seam; don't couple the loop to concrete backends.
 - `router.py` — deterministic keyword routing (order-stable tuple of rules → specialist name, `generalist` fallback). Determinism here is a contract, not an implementation detail: same goal must always select the same route.
 - `model.py` — the model plane: four backends behind one `complete(prompt)` interface — `offline` (echo transport, exercises the plane with no network), `frontier` (Anthropic), `system` (local endpoint), `byok`. **API keys come from the environment by convention, never from the manifest**: `ANTHROPIC_API_KEY`, `SKILLCELL_SYSTEM_ENDPOINT`, `SKILLCELL_BYOK_KEY`.
 - `evalgate.py` — the eval gate a cell must pass before reporting done.
-- `cli.py` — `doctor` and `run` subcommands; exit 2 on manifest errors.
+- `cli.py` — `doctor`, `run`, and `validate` subcommands; exit 2 on manifest errors.
 
 ## Constraints
 

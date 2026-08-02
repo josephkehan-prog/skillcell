@@ -81,6 +81,7 @@ skillcell/
 ```bash
 uv sync
 uv run skillcell doctor
+uv run skillcell validate examples/refactor-audit-chain.yaml
 uv run skillcell run examples/cell.yaml --goal "triage firmware image" --json
 ```
 
