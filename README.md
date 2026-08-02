@@ -17,7 +17,7 @@
 Every serious agent platform now containerizes the *runtime* (OpenHands, Devin,
 Codex Cloud, Claude Code cloud, Copilot all run a sandbox per task). skillcell's
 bet is one layer they don't: make the **skill itself** the mono-scoped, reusable
-unit — pinned to its own LoRA adapter for deterministic behavior — that agents
+unit — pinned to its own LoRA adapter for reproducible behavior — that agents
 travel into. Sandboxing per task is settled; per-skill weight specialization
 was just proven in research (Skill-to-LoRA, LatentSkill — June 2026), but
 nobody ships it as a product unit. The papers proved the adapter; skillcell
@@ -79,6 +79,8 @@ skillcell/
 │   └── refactor-audit-chain.yaml   implement-then-audit two-cell chain
 ├── .github/
 │   └── workflows/ci.yml   lint, type-check, tests, security scan on every push
+├── src/skillcell/       phase-0 runner: manifest, model plane, loop, router, eval gate, CLI
+├── docs/index.html      landing page
 └── ee/                  commercial edition — separate closed license (see ee/LICENSE.md)
 ```
 

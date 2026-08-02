@@ -155,11 +155,13 @@ def _extract_alias_refs(obj: Any) -> set[str]:
 
 
 def _parse_nodes(nodes_raw: Any) -> tuple[list[ChainNode], set[str]]:
-    """Parse nodes and return (nodes list, declared aliases set). Validates refs."""
+    """Parse nodes in two passes: collect aliases, then validate refs."""
     if not nodes_raw:
         raise ManifestError("spec.nodes is required and must be non-empty")
     nodes: list[ChainNode] = []
     declared_aliases: set[str] = set()
+
+    # Pass 1: parse node structure and collect aliases
     for node_raw in nodes_raw:
         if not isinstance(node_raw, dict):
             raise ManifestError("each node must be a mapping")
@@ -171,11 +173,13 @@ def _parse_nodes(nodes_raw: Any) -> tuple[list[ChainNode], set[str]]:
         inputs = node_raw.get("inputs") or {}
         nodes.append(ChainNode(cell=str(cell), alias=alias_str, inputs=inputs))
         declared_aliases.add(alias_str)
-        # Validate input refs
-        refs = _extract_alias_refs(inputs)
+
+    # Pass 2: validate input refs against all declared aliases
+    for node in nodes:
+        refs = _extract_alias_refs(node.inputs)
         for ref in refs:
             if ref not in declared_aliases:
-                raise ManifestError(f"undeclared alias '{ref}' in node {alias_str} input")
+                raise ManifestError(f"undeclared alias '{ref}' in node {node.alias} input")
     return nodes, declared_aliases
 
 

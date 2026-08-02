@@ -54,7 +54,7 @@ Same manifest, two runtimes:
   container entrypoint. This is the unit the orchestrator schedules — on the
   local Docker/Apple-container runtime first, on real Kubernetes later.
 
-## 5. Adapter plane (deterministic per-cell models)
+## 5. Adapter plane (reproducible per-cell models)
 
 Goal: the backend model is *transformed into the skill* rather than prompted
 with it, eliminating cross-skill personality clash and run-to-run drift.

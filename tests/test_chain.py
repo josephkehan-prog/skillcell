@@ -167,3 +167,36 @@ spec:
             assert "name" in captured.err.lower()
         finally:
             Path(f.name).unlink()
+
+
+def test_load_chain_nodes_out_of_declaration_order_valid():
+    import tempfile
+    from pathlib import Path
+
+    yaml_content = """apiVersion: skillcell.dev/v1alpha1
+kind: Chain
+metadata:
+  name: out-of-order-chain
+spec:
+  nodes:
+    - cell: first-cell
+      as: first
+      inputs:
+        data: ${second.outputs.result}
+    - cell: second-cell
+      as: second
+  edges:
+    - from: second
+      to: first
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        f.write(yaml_content)
+        f.flush()
+        try:
+            chain = load_chain(f.name)
+            assert chain.name == "out-of-order-chain"
+            assert len(chain.nodes) == 2
+            assert chain.nodes[0].alias == "first"
+            assert chain.nodes[1].alias == "second"
+        finally:
+            Path(f.name).unlink()
