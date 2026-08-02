@@ -7,7 +7,7 @@
 <p align="center"><strong>The cell is the skill</strong> - weight-pinned, reusable, agents dispatched into it.</p>
 
 <p align="center">
-  <code>pip install skillcell</code> &nbsp;·&nbsp; <a href="https://boredinnyc.github.io/skillcell/">Landing page</a> &nbsp;·&nbsp; Apache-2.0 open core
+  <code>pip install skillcell</code> &nbsp;·&nbsp; <a href="https://josephkehan-prog.github.io/skillcell/">Landing page</a> &nbsp;·&nbsp; Apache-2.0 open core
 </p>
 
 ---
