@@ -7,14 +7,16 @@ import json
 import os
 import sys
 from collections.abc import Sequence
-from pathlib import Path
-
-import yaml
 
 from .loop import run_loop
-from .manifest import ManifestError, load_cell, load_chain
+from .manifest import Cell, ManifestError, load_cell, load_manifest
 from .model import BackendError, resolve_backend
 from .router import default_router
+
+
+def _fail(exc: Exception) -> int:
+    print(f"error: {exc}", file=sys.stderr)
+    return 2
 
 
 def _cmd_doctor(_: argparse.Namespace) -> int:
@@ -27,40 +29,19 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
 
 def _cmd_validate(ns: argparse.Namespace) -> int:
     try:
-        text = Path(ns.manifest).read_text()
-        docs = list(yaml.safe_load_all(text))
-        if not docs or not isinstance(docs[0], dict):
-            raise ManifestError("manifest must be a mapping")
-        kind = docs[0].get("kind")
-    except (FileNotFoundError, OSError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
-    except yaml.YAMLError as exc:
-        print(f"error: invalid YAML: {exc}", file=sys.stderr)
-        return 2
-
-    try:
-        if kind == "Cell":
-            cell = load_cell(ns.manifest)
-            print(f"VALID kind=Cell name={cell.name}")
-            return 0
-        elif kind == "Chain":
-            chain = load_chain(ns.manifest)
-            print(f"VALID kind=Chain name={chain.name}")
-            return 0
-        else:
-            raise ManifestError(f"unexpected kind '{kind}'")
-    except ManifestError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+        manifest = load_manifest(ns.manifest)
+    except (ManifestError, FileNotFoundError, OSError) as exc:
+        return _fail(exc)
+    kind = "Cell" if isinstance(manifest, Cell) else "Chain"
+    print(f"VALID kind={kind} name={manifest.name}")
+    return 0
 
 
 def _cmd_run(ns: argparse.Namespace) -> int:
     try:
         cell = load_cell(ns.manifest)
     except (ManifestError, FileNotFoundError, OSError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+        return _fail(exc)
 
     try:
         backend = resolve_backend(cell.model, env=os.environ)

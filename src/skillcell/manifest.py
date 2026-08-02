@@ -97,23 +97,29 @@ def _parse_model(raw: dict[str, Any]) -> ModelSpec:
     )
 
 
-def load_cell(path: str | Path) -> Cell:
+def _first_doc(path: str | Path) -> dict[str, Any]:
+    """Read a manifest file and return its first YAML document as a mapping."""
     text = Path(path).read_text()
     try:
-        doc = yaml.safe_load(text)
-    except yaml.YAMLError as exc:  # pragma: no cover - passthrough
+        docs = list(yaml.safe_load_all(text))
+    except yaml.YAMLError as exc:
         raise ManifestError(f"invalid YAML: {exc}") from exc
-    if not isinstance(doc, dict):
+    if not docs or not isinstance(docs[0], dict):
         raise ManifestError("manifest must be a mapping")
+    return docs[0]
 
-    kind = doc.get("kind")
-    if kind != "Cell":
-        raise ManifestError(f"unexpected kind '{kind}'; expected 'Cell'")
 
+def _named_spec(doc: dict[str, Any], kind: str) -> tuple[str, dict[str, Any]]:
+    """Check the document's kind and return (metadata.name, spec)."""
+    if doc.get("kind") != kind:
+        raise ManifestError(f"unexpected kind '{doc.get('kind')}'; expected '{kind}'")
     metadata = doc.get("metadata") or {}
     name = _require(metadata, "name", "metadata")
+    return str(name), doc.get("spec") or {}
 
-    spec = doc.get("spec") or {}
+
+def _cell_from_doc(doc: dict[str, Any]) -> Cell:
+    name, spec = _named_spec(doc, "Cell")
     scope = _require(spec, "scope", "spec")
     runtime = _require(spec, "runtime", "spec")
     if runtime not in RUNTIMES:
@@ -128,7 +134,7 @@ def load_cell(path: str | Path) -> Cell:
         model = _parse_model(spec["model"])
 
     return Cell(
-        name=str(name),
+        name=name,
         scope=str(scope),
         runtime=str(runtime),
         inputs=inputs,
@@ -137,6 +143,10 @@ def load_cell(path: str | Path) -> Cell:
         tools=tuple(spec.get("tools") or ()),
         network=str(spec.get("network", "deny")),
     )
+
+
+def load_cell(path: str | Path) -> Cell:
+    return _cell_from_doc(_first_doc(path))
 
 
 def _extract_alias_refs(obj: Any) -> set[str]:
@@ -201,25 +211,23 @@ def _parse_edges(edges_raw: Any, declared_aliases: set[str]) -> list[ChainEdge]:
     return edges
 
 
-def load_chain(path: str | Path) -> Chain:
-    text = Path(path).read_text()
-    try:
-        docs = list(yaml.safe_load_all(text))
-    except yaml.YAMLError as exc:  # pragma: no cover - passthrough
-        raise ManifestError(f"invalid YAML: {exc}") from exc
-    if not docs or not isinstance(docs[0], dict):
-        raise ManifestError("manifest must be a mapping")
-    doc = docs[0]
-
-    kind = doc.get("kind")
-    if kind != "Chain":
-        raise ManifestError(f"unexpected kind '{kind}'; expected 'Chain'")
-
-    metadata = doc.get("metadata") or {}
-    name = _require(metadata, "name", "metadata")
-
-    spec = doc.get("spec") or {}
+def _chain_from_doc(doc: dict[str, Any]) -> Chain:
+    name, spec = _named_spec(doc, "Chain")
     nodes_list, declared_aliases = _parse_nodes(spec.get("nodes"))
     edges_list = _parse_edges(spec.get("edges"), declared_aliases)
+    return Chain(name=name, nodes=tuple(nodes_list), edges=tuple(edges_list))
 
-    return Chain(name=str(name), nodes=tuple(nodes_list), edges=tuple(edges_list))
+
+def load_chain(path: str | Path) -> Chain:
+    return _chain_from_doc(_first_doc(path))
+
+
+def load_manifest(path: str | Path) -> Cell | Chain:
+    """Load a manifest of any supported kind, parsing the file once."""
+    doc = _first_doc(path)
+    kind = doc.get("kind")
+    if kind == "Cell":
+        return _cell_from_doc(doc)
+    if kind == "Chain":
+        return _chain_from_doc(doc)
+    raise ManifestError(f"unexpected kind '{kind}'; expected 'Cell' or 'Chain'")

@@ -112,3 +112,33 @@ def test_model_parsed(tmp_path):
     assert cell.model.plane == "frontier"
     assert cell.model.decode.temperature == 0.0
     assert cell.model.decode.seed == 1
+
+
+def test_load_manifest_dispatches_cell():
+    from skillcell.manifest import Cell, load_manifest
+
+    cell = load_manifest("examples/cell.yaml")
+    assert isinstance(cell, Cell)
+    assert cell.name == "firmware-triage"
+
+
+def test_load_manifest_dispatches_chain():
+    from skillcell.manifest import Chain, load_manifest
+
+    chain = load_manifest("examples/chain.yaml")
+    assert isinstance(chain, Chain)
+    assert chain.name == "firmware-audit-report"
+
+
+def test_load_manifest_unknown_kind_raises():
+    import tempfile
+
+    import pytest
+
+    from skillcell.manifest import ManifestError, load_manifest
+
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+        f.write("apiVersion: skillcell.dev/v1alpha1\nkind: Widget\nmetadata: {name: x}\nspec: {}\n")
+        path = f.name
+    with pytest.raises(ManifestError, match="unexpected kind"):
+        load_manifest(path)
