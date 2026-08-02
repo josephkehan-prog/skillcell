@@ -54,10 +54,48 @@ skillcell/
 └── ee/                  commercial edition — separate closed license (see ee/LICENSE.md)
 ```
 
+## Quickstart (phase 0 — local cell runner)
+
+```bash
+uv sync
+uv run skillcell doctor
+uv run skillcell run examples/cell.yaml --goal "triage firmware image" --json
+```
+
+Offline by default: with no `model` in the manifest, the loop aligns, routes,
+gates, records, and stops — the `act` stage is marked `skipped`. Add a model
+plane to enable the specialist turn.
+
+### Model planes
+
+Three backends behind one interface; keys come from the environment, never the
+manifest:
+
+| Plane | Manifest `model.plane` | Key (env) | Use |
+| --- | --- | --- | --- |
+| Frontier | `frontier` | `ANTHROPIC_API_KEY` | hosted frontier model (Claude) |
+| System-native | `system` | none | local model on this machine (MLX / Ollama `endpoint`) |
+| BYOK | `byok` | `SKILLCELL_BYOK_KEY` | any OpenAI-compatible `provider` + `base_url` |
+
+```yaml
+spec:
+  model:
+    plane: byok
+    base: gpt-4o
+    provider: openai
+    base_url: https://api.openai.com/v1
+    decode: { temperature: 0.0, seed: 1 }   # deterministic decode
+```
+
+Act mode (`--act`) additionally requires the authorization gate
+(`--authorized`) to pass before the specialist turn runs.
+
 ## Status
 
-Design phase. `docs/ARCHITECTURE.md` is the source of truth; the roadmap at
-the bottom of that document tracks implementation phases.
+Phase 0 shipped: local cell runner (manifest, model plane, seven-stage loop,
+eval gate, CLI) — TDD'd, security-scanned, packaged to a wheel. See the
+roadmap in `docs/ARCHITECTURE.md` for phases 1–4 (containers, adapter plane,
+orchestrator, kube mode). That document is the source of truth for the design.
 
 ## Licensing
 

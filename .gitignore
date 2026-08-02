@@ -9,3 +9,11 @@ artifacts/
 *.adapter
 *.safetensors
 .DS_Store
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+*.egg-info/
+uv.lock
+.claude/
