@@ -7,7 +7,9 @@ import json
 import os
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
+from .container import ContainerError, run_command, run_in_container
 from .loop import run_loop
 from .manifest import Cell, ManifestError, load_cell, load_manifest
 from .model import BackendError, resolve_backend
@@ -50,11 +52,51 @@ def _cmd_tui(ns: argparse.Namespace) -> int:  # pragma: no cover - interactive
     return 0
 
 
+def _run_container(cell: Cell, ns: argparse.Namespace) -> int:
+    cell_dir = Path(ns.manifest).resolve().parent
+
+    # Same authorization gate as the local loop's act stage: running the
+    # container IS the act. Without --act this is a dry run; with --act but
+    # no --authorized it is blocked. Docker is never touched on either path.
+    if not (ns.act and ns.authorized):
+        status = "blocked" if ns.act else "skipped"
+        try:
+            planned = " ".join(run_command(cell, cell_dir=cell_dir, goal=ns.goal))
+        except ContainerError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 3
+        print(f"cell={cell.name} runtime=container act={status}")
+        print(f"planned: {planned}")
+        if status == "blocked":
+            print("authorization required: pass --act --authorized to execute")
+        return 0
+
+    try:
+        code, output = run_in_container(cell, cell_dir=cell_dir, goal=ns.goal)
+    except ContainerError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 3
+    if ns.json:
+        print(
+            json.dumps(
+                {"cell": cell.name, "runtime": "container", "exit_code": code, "output": output}
+            )
+        )
+    else:
+        print(f"cell={cell.name} runtime=container exit_code={code}")
+        if output:
+            print(output, end="" if output.endswith("\n") else "\n")
+    return 0 if code == 0 else 1
+
+
 def _cmd_run(ns: argparse.Namespace) -> int:
     try:
         cell = load_cell(ns.manifest)
     except (ManifestError, FileNotFoundError, OSError) as exc:
         return _fail(exc)
+
+    if cell.runtime == "container":
+        return _run_container(cell, ns)
 
     try:
         backend = resolve_backend(cell.model, env=os.environ)

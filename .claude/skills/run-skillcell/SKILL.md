@@ -99,9 +99,12 @@ uv run pytest --cov     # 67 tests, 80% coverage floor enforced
   not a bug.
 - **Exit codes:** `validate` and manifest errors → 2, backend/model errors
   in `run` → 3, success → 0. The driver asserts these.
-- **`runtime: container` cells** aren't wired into `skillcell run` yet;
-  `container.py` builds the docker argv but the CLI always runs the local
-  loop. Don't expect a container to start.
+- **`runtime: container` cells dispatch to docker, behind the act gate.**
+  Without `--act --authorized`, `skillcell run` is a dry run: it prints the
+  planned `docker run` argv and executes nothing (exit 0; `--act` alone
+  shows act=blocked). With both flags it builds (if needed) and runs the
+  image: exit 3 when docker is missing, exit 1 when the container exits
+  non-zero (its code is shown). Local cells are untouched by this path.
 
 ## Troubleshooting
 
