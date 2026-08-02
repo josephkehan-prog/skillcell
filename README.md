@@ -1,8 +1,15 @@
 # skillcell
 
-**Send agents to the work — don't load the work into agents.**
+**The cell is the skill — weight-pinned, reusable, agents dispatched into it.**
 
-skillcell inverts the current agent-skill workflow. Today, a user opens one
+Every serious agent platform now containerizes the *runtime* (OpenHands, Devin,
+Codex Cloud, Claude Code cloud, Copilot all run a sandbox per task). skillcell's
+bet is one layer they don't: make the **skill itself** the mono-scoped, reusable
+unit — pinned to its own LoRA adapter for deterministic behavior — that agents
+travel into. Sandboxing per task is settled; per-skill weight specialization is
+not. That pairing is the differentiator.
+
+It inverts the current agent-skill workflow. Today, a user opens one
 generalist LLM session and loads skills *into* it: context bloats, model
 "personalities" clash, results drift run to run. skillcell turns each skill,
 plugin, or repo into a **cell** — a self-contained, mono-scoped workspace with
