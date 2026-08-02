@@ -209,7 +209,7 @@ OFFLINE_LOOP=ready
         <ul>
           <li>The skill is a workspace; the agent travels to it</li>
           <li>Each cell holds only its own scope</li>
-          <li>Adapter plus pinned decode, deterministic</li>
+          <li>Adapter plus pinned decode, bit-reproducible locally</li>
           <li>One adapter per cell, no cross-talk</li>
           <li>Declarative DAG, reconciled by an orchestrator</li>
         </ul>
@@ -251,7 +251,7 @@ OFFLINE_LOOP=ready
       <div class="cell wide reveal">
         <div class="k">model</div>
         <h4>A pinned base plus an optional LoRA adapter</h4>
-        <p>Temperature zero, fixed seed, hashed weights. The backend is transformed into the skill instead of prompted with it, so runs are reproducible and free of cross-skill personality clash.</p>
+        <p>Temperature zero, fixed seed, hashed weights — bit-reproducible on single-tenant local decode (MLX-LM, batch size 1); shared batched serving needs batch-invariant kernels to match. The backend is transformed into the skill instead of prompted with it, cutting cross-skill personality clash.</p>
       </div>
     </div>
   </div>
@@ -276,7 +276,7 @@ OFFLINE_LOOP=ready
       </div>
     </div>
     <div class="diff reveal">
-      <strong>The differentiator.</strong> Everyone containerizes the runtime. Skill Cell is the layer that pins the skill itself to its own adapter, so behavior is deterministic and reusable, not just sandboxed.
+      <strong>The differentiator.</strong> Everyone containerizes the runtime. Skill Cell is the layer that pins the skill itself to its own adapter, so behavior is reproducible and reusable, not just sandboxed.
     </div>
   </div>
 </section>

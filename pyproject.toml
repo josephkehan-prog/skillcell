@@ -42,6 +42,9 @@ testpaths = ["tests"]
 branch = true
 source = ["skillcell"]
 
+[tool.coverage.report]
+fail_under = 80
+
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
