@@ -65,7 +65,10 @@ with it, eliminating cross-skill personality clash and run-to-run drift.
   versioned artifacts in an adapter registry.
 - **Adoption.** When a subagent enters a cell, it adopts the cell's identity:
   adapter loaded, cell system prompt applied, toolset swapped. On exit,
-  nothing leaks back.
+  nothing leaks back. Adapters are swapped between cells, never stacked
+  within one — sidestepping the multi-adapter interference production
+  reports describe, where composed adapters fight over the same weight
+  regions until output collapses toward base-model quality.
 - **Determinism.** Manifest pins base-model hash, adapter hash, temperature 0
   (or fixed seed where sampling is required), and the prompt template
   version. Same inputs → same route → same artifacts, or the eval gate fails

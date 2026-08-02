@@ -10,6 +10,8 @@
   <code>pip install skillcell</code> &nbsp;·&nbsp; <a href="https://josephkehan-prog.github.io/skillcell/">Landing page</a> &nbsp;·&nbsp; Apache-2.0 open core
 </p>
 
+<p align="center"><img src="https://github.com/josephkehan-prog/skillcell/actions/workflows/ci.yml/badge.svg" alt="ci"></p>
+
 ---
 
 Every serious agent platform now containerizes the *runtime* (OpenHands, Devin,
@@ -44,7 +46,8 @@ orchestrator chains cells together Kubernetes-style for larger tasks.
    weight and adapter hashes — which gives bit-reproducible runs on
    single-tenant local serving (MLX-LM, batch size 1); on shared batched
    inference, reproducibility additionally requires batch-invariant kernels,
-   which the manifest can declare.
+   which the manifest can declare. One adapter per cell, swapped rather than
+   stacked, also sidesteps multi-adapter interference entirely.
 4. **Orchestrator** — a Kubernetes-style control plane reconciles declarative
    manifests (`Cell`, `Chain`, `Run`). A `Chain` is a DAG of cells; the
    scheduler dispatches subagents into each cell, where they **adopt** the
@@ -71,8 +74,11 @@ skillcell/
 ├── docs/
 │   └── ARCHITECTURE.md  full design: cells, adapter plane, orchestrator, roadmap
 ├── examples/
-│   ├── cell.yaml        a single mono-scoped cell manifest
-│   └── chain.yaml       a DAG of cells run by the orchestrator
+│   ├── cell.yaml                   a single mono-scoped cell manifest
+│   ├── chain.yaml                  a DAG of cells run by the orchestrator
+│   └── refactor-audit-chain.yaml   implement-then-audit two-cell chain
+├── .github/
+│   └── workflows/ci.yml   lint, type-check, tests, security scan on every push
 └── ee/                  commercial edition — separate closed license (see ee/LICENSE.md)
 ```
 
@@ -107,7 +113,7 @@ spec:
     base: gpt-4o
     provider: openai
     base_url: https://api.openai.com/v1
-    decode: { temperature: 0.0, seed: 1 }   # deterministic decode
+    decode: { temperature: 0.0, seed: 1 }   # pinned decode
 ```
 
 Act mode (`--act`) additionally requires the authorization gate
