@@ -61,12 +61,19 @@ def _run_container(cell: Cell, ns: argparse.Namespace) -> int:
     if not (ns.act and ns.authorized):
         status = "blocked" if ns.act else "skipped"
         try:
-            planned = " ".join(run_command(cell, cell_dir=cell_dir, goal=ns.goal))
+            planned = run_command(cell, cell_dir=cell_dir, goal=ns.goal)
         except ContainerError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 3
+        if ns.json:
+            print(
+                json.dumps(
+                    {"cell": cell.name, "runtime": "container", "act": status, "planned": planned}
+                )
+            )
+            return 0
         print(f"cell={cell.name} runtime=container act={status}")
-        print(f"planned: {planned}")
+        print(f"planned: {' '.join(planned)}")
         if status == "blocked":
             print("authorization required: pass --act --authorized to execute")
         return 0

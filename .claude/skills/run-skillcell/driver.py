@@ -44,6 +44,8 @@ def smoke() -> None:
         code, out = _run(["uv", "run", "skillcell", "validate", str(manifest)])
         _check(f"validate {manifest.name}", code == 0 and "VALID" in out, out)
 
+    # examples/cell.yaml is runtime: container — without --act --authorized
+    # this is a gated dry run and the JSON carries the planned docker argv.
     code, out = _run(
         [
             "uv",
@@ -56,14 +58,44 @@ def smoke() -> None:
             "--json",
         ]
     )
+    _check("container dry run exits 0", code == 0, out)
+    payload = json.loads(out)
+    _check("dry run act skipped", payload["act"] == "skipped", out)
+    _check("dry run plans docker run", payload["planned"][:2] == ["docker", "run"], out)
+    _check("hermetic network flag planned", "--network=none" in payload["planned"], out)
+
+    # Local-loop path: same contract as before, via a temp local-runtime cell.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        local = Path(td) / "local.yaml"
+        local.write_text(
+            "apiVersion: skillcell.dev/v1alpha1\nkind: Cell\n"
+            "metadata: {name: smoke-local}\n"
+            "spec: {scope: triage firmware image, runtime: local}\n"
+        )
+        code, out = _run(
+            [
+                "uv",
+                "run",
+                "skillcell",
+                "run",
+                str(local),
+                "--goal",
+                "triage firmware image",
+                "--json",
+            ]
+        )
     _check("offline run exits 0", code == 0, out)
     payload = json.loads(out)
     _check("route is firmware-pentest", payload["route"] == "firmware-pentest", out)
     _check("act stage skipped offline", not payload["executed"], out)
     stages = [s["name"] for s in payload["stages"]]
-    _check("all seven stages present", stages == [
-        "align", "review", "select", "gate", "act", "record", "stop"
-    ], str(stages))
+    _check(
+        "all seven stages present",
+        stages == ["align", "review", "select", "gate", "act", "record", "stop"],
+        str(stages),
+    )
 
     code, out = _run(["uv", "run", "skillcell", "validate", "/nonexistent.yaml"])
     _check("missing manifest exits 2", code == 2, out)

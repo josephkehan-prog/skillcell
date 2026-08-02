@@ -143,3 +143,18 @@ def test_run_container_act_without_authorization_is_blocked(tmp_path, capsys, mo
     captured = capsys.readouterr()
     assert code == 0
     assert "act=blocked" in captured.out
+
+
+def test_run_container_dry_run_json_contract(tmp_path, capsys, monkeypatch):
+    import skillcell.container as container_mod
+
+    monkeypatch.setattr(container_mod.shutil, "which", lambda _: "/usr/bin/docker")
+    manifest = _container_cell(tmp_path)
+    code = main(["run", str(manifest), "--goal", "g", "--json"])
+    captured = capsys.readouterr()
+    assert code == 0
+    payload = json.loads(captured.out)
+    assert payload["cell"] == "boxed"
+    assert payload["runtime"] == "container"
+    assert payload["act"] == "skipped"
+    assert payload["planned"][:2] == ["docker", "run"]

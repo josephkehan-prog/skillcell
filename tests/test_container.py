@@ -147,5 +147,6 @@ def test_local_cell_without_container_block_raises(tmp_path):
     )
     cell = load_cell(manifest)
     with pytest.raises(ContainerError, match="container"):
-        run_in_container(cell, cell_dir=tmp_path, goal="g", runner=lambda a: (0, ""),
-                         docker_path="docker")
+        run_in_container(
+            cell, cell_dir=tmp_path, goal="g", runner=lambda a: (0, ""), docker_path="docker"
+        )
