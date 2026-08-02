@@ -1,0 +1,40 @@
+# Two-cell chain: one model refactors, a second model audits the diff before
+# it ships — the implement-then-audit pattern practitioners already run by
+# hand with two models, made declarative.
+apiVersion: skillcell.dev/v1alpha1
+kind: Chain
+metadata:
+  name: refactor-then-audit
+spec:
+  nodes:
+    - cell: refactor-surgeon
+      as: surgeon                 # produces diff (patch) and rationale (markdown)
+    - cell: code-audit
+      as: auditor                 # produces findings (json) and verdict (markdown)
+      inputs:
+        diff: ${surgeon.outputs.diff}
+        rationale: ${surgeon.outputs.rationale}
+
+  edges:
+    - from: surgeon
+      to: auditor
+
+  policy:
+    retry:
+      max: 2
+      backoff: exponential
+    onGateFail: park             # stop and surface for operator decision
+---
+# One execution of the chain. The orchestrator reconciles this to completion.
+apiVersion: skillcell.dev/v1alpha1
+kind: Run
+metadata:
+  name: refactor-audit-demo
+spec:
+  chain: refactor-then-audit
+  runtime: local                  # local | kube
+  inputs:
+    repo: ./target-repo
+    goal: "extract the parser into its own module"
+  record:
+    transcript: true              # full iteration record, resumable + auditable

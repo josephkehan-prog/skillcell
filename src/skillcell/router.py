@@ -13,6 +13,8 @@ _RULES: tuple[tuple[str, str], ...] = (
     ("burp", "burp-mcp"),
     ("ctf", "ctf-workflow"),
     ("web", "web-recon"),
+    ("refactor", "refactor-surgeon"),
+    ("audit", "code-audit"),
 )
 
 

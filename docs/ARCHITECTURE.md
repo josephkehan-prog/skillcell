@@ -69,7 +69,12 @@ with it, eliminating cross-skill personality clash and run-to-run drift.
 - **Determinism.** Manifest pins base-model hash, adapter hash, temperature 0
   (or fixed seed where sampling is required), and the prompt template
   version. Same inputs → same route → same artifacts, or the eval gate fails
-  the run.
+  the run. Temperature 0 and a fixed seed pin sampling, not the reduction
+  kernel: batched serving is batch-size-dependent nondeterministic, so local
+  MLX single-tenant decode (batch size 1) is the bit-reproducible path today.
+  vLLM multi-LoRA at scale needs batch-invariant kernels (current published
+  overhead: ~34%) to match it; until a cell opts into those kernels, the eval
+  gate treats its runs as statistically, not bitwise, reproducible.
 - **Serving.**
   - Workstation (Apple Silicon): **MLX-LM** — native LoRA training and
     adapter loading, runs locally.
@@ -139,6 +144,13 @@ gluing these, not a rebuild of any of them:
 - **devcontainers** — adopted outright for cell provisioning.
 - **vLLM multi-LoRA / S-LoRA** — adopted for adapter serving at scale.
 - **MLX-LM** — adopted for local adapter training/serving.
+- **LatentSkill** (arXiv 2606.06087) — skill text compiled to LoRA via
+  hypernetwork; validates the adapter plane, no workspace/contract/orchestration.
+- **Skill-to-LoRA** (arXiv 2606.16769) — SKILL.md distilled into a LoRA,
+  document dropped at runtime; same validation, same gap.
+- **Parametric Skills** (arXiv 2606.30015) — same skills-as-weights direction.
+- **AgentSkillOS** (NPU, 2026) — orchestrates 200K+ skills into workflows;
+  skills stay prompt-level, no weight pinning or hermetic cells.
 - **Temporal / Dagger** — candidate execution substrates for chains; deferred
   until chains outgrow the built-in reconciler.
 - **LangGraph / Claude Agent SDK** — in-cell loop runtime; adopted (SDK)

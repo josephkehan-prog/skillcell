@@ -16,8 +16,10 @@ Every serious agent platform now containerizes the *runtime* (OpenHands, Devin,
 Codex Cloud, Claude Code cloud, Copilot all run a sandbox per task). skillcell's
 bet is one layer they don't: make the **skill itself** the mono-scoped, reusable
 unit — pinned to its own LoRA adapter for deterministic behavior — that agents
-travel into. Sandboxing per task is settled; per-skill weight specialization is
-not. That pairing is the differentiator.
+travel into. Sandboxing per task is settled; per-skill weight specialization
+was just proven in research (Skill-to-LoRA, LatentSkill — June 2026), but
+nobody ships it as a product unit. The papers proved the adapter; skillcell
+ships the cell around it: contract, tools, LSP, eval gate, orchestration.
 
 It inverts the current agent-skill workflow. Today, a user opens one
 generalist LLM session and loads skills *into* it: context bloats, model
@@ -38,8 +40,11 @@ orchestrator chains cells together Kubernetes-style for larger tasks.
    devcontainer-compatible spec. Same manifest, two runtimes.
 3. **Adapter plane** — instead of prompting a shared generalist model, a
    cell may pin a base model plus a **LoRA adapter** trained on that cell's
-   skill traces. Decoding is deterministic: temperature 0, fixed seed,
-   pinned weight and adapter hashes. No personality clash, reproducible runs.
+   skill traces. Decoding is pinned — temperature 0, fixed seed, pinned
+   weight and adapter hashes — which gives bit-reproducible runs on
+   single-tenant local serving (MLX-LM, batch size 1); on shared batched
+   inference, reproducibility additionally requires batch-invariant kernels,
+   which the manifest can declare.
 4. **Orchestrator** — a Kubernetes-style control plane reconciles declarative
    manifests (`Cell`, `Chain`, `Run`). A `Chain` is a DAG of cells; the
    scheduler dispatches subagents into each cell, where they **adopt** the
@@ -52,7 +57,7 @@ orchestrator chains cells together Kubernetes-style for larger tasks.
 | ---------------------------------- | -------------------------------------------- |
 | Skill loads into a shared session  | Skill *is* a workspace; agent travels to it  |
 | One context holds everything       | Each cell holds only its own scope           |
-| Prompt-level behavior, drifts      | Adapter + pinned decode, deterministic       |
+| Prompt-level behavior, drifts      | Adapter + pinned decode, bit-reproducible locally |
 | Personality/style clash across skills | One adapter per cell, no cross-talk       |
 | Manual chaining by the user        | Declarative DAG, reconciled by orchestrator  |
 | Tools/LSP configured per session   | Tools/LSP provisioned per cell, once         |
