@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Cell - the cell is the skill</title>
+<meta name="description" content="Skill Cell inverts the agent-skill workflow: every skill becomes a mono-scoped, weight-pinned workspace that agents are dispatched into, orchestrated Kubernetes-style.">
+<style>
+  :root{
+    --bg:#ffffff; --bg-2:#f6f7f6; --panel:#ffffff; --border:#e4e7e4;
+    --ink:#12140f; --ink-2:#5c6159; --accent:#1f9e5a; --accent-ink:#0b3d22;
+    --code-bg:#0f1310; --code-ink:#d7e0d4; --radius:14px;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0c0f0c; --bg-2:#0f130f; --panel:#12160f; --border:#232a22;
+      --ink:#eef2ea; --ink-2:#97a094; --accent:#3fd07f; --accent-ink:#d7ffe6;
+      --code-bg:#080b08; --code-ink:#cfe3cd;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  code,pre,.mono{font-family:var(--mono)}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--border);height:64px;display:flex;align-items:center}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;width:100%}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.01em}
+  .brand svg{width:26px;height:26px;display:block}
+  .navlinks{display:flex;align-items:center;gap:22px;font-size:14px;color:var(--ink-2)}
+  .navlinks a:hover{color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;
+    font-size:14px;font-weight:600;border:1px solid transparent;transition:transform .12s ease,background .2s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--accent);color:#04140b}
+  .btn-primary:hover{filter:brightness(1.06)}
+  .btn-ghost{border-color:var(--border);color:var(--ink)}
+  .btn-ghost:hover{background:var(--bg-2)}
+  @media(max-width:640px){.navlinks a:not(.btn){display:none}}
+
+  /* hero */
+  header{padding:72px 0 40px}
+  .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 18px}
+  h1{font-size:clamp(34px,5vw,56px);line-height:1.02;letter-spacing:-.03em;margin:0 0 20px;font-weight:680}
+  h1 .em{color:var(--accent)}
+  .lede{font-size:19px;color:var(--ink-2);max-width:34ch;margin:0 0 28px}
+  .cta-row{display:flex;gap:12px;flex-wrap:wrap}
+  .terminal{background:var(--code-bg);border:1px solid var(--border);border-radius:var(--radius);
+    overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.18)}
+  .term-bar{display:flex;gap:7px;padding:12px 14px;border-bottom:1px solid #1c241c}
+  .term-bar i{width:11px;height:11px;border-radius:50%;background:#2b352b;display:block}
+  .terminal pre{margin:0;padding:18px 18px 22px;color:var(--code-ink);font-size:13px;line-height:1.7;overflow-x:auto}
+  .term-cmd{color:var(--accent)}
+  .term-dim{color:#6f7c6d}
+  @media(max-width:820px){.hero{grid-template-columns:1fr;gap:32px}.lede{max-width:none}}
+
+  /* sections */
+  section{padding:64px 0;border-top:1px solid var(--border)}
+  h2{font-size:clamp(24px,3.4vw,34px);letter-spacing:-.02em;margin:0 0 14px;font-weight:660}
+  .sub{color:var(--ink-2);max-width:60ch;margin:0 0 36px;font-size:16px}
+
+  /* inversion two-panel */
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .col{border:1px solid var(--border);border-radius:var(--radius);padding:24px;background:var(--panel)}
+  .col.now{opacity:.82}
+  .col h3{margin:0 0 16px;font-size:15px;font-family:var(--mono);letter-spacing:.02em}
+  .col.now h3{color:var(--ink-2)}
+  .col.new h3{color:var(--accent)}
+  .col ul{margin:0;padding:0;list-style:none}
+  .col li{padding:10px 0;border-top:1px solid var(--border);font-size:14.5px;color:var(--ink-2)}
+  .col li:first-child{border-top:none}
+  .col.new li{color:var(--ink)}
+  @media(max-width:720px){.compare{grid-template-columns:1fr}}
+
+  /* anatomy bento */
+  .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+  .cell{border:1px solid var(--border);border-radius:var(--radius);padding:22px;background:var(--panel)}
+  .cell .k{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.04em}
+  .cell h4{margin:10px 0 6px;font-size:16px;letter-spacing:-.01em}
+  .cell p{margin:0;color:var(--ink-2);font-size:14px}
+  .cell.big{grid-column:span 3}
+  .cell.reg{grid-column:span 2}
+  .cell.wide{grid-column:span 6;background:
+    linear-gradient(120deg,color-mix(in srgb,var(--accent) 12%,var(--panel)),var(--panel))}
+  @media(max-width:820px){.bento{grid-template-columns:1fr 1fr}.cell.big,.cell.reg,.cell.wide{grid-column:span 2}}
+  @media(max-width:520px){.bento{grid-template-columns:1fr}.cell.big,.cell.reg,.cell.wide{grid-column:span 1}}
+
+  /* model planes - left rail list, differentiator highlighted */
+  .planes{display:grid;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .plane{display:grid;grid-template-columns:150px 1fr;gap:20px;padding:20px 24px;border-top:1px solid var(--border);align-items:baseline}
+  .plane:first-child{border-top:none}
+  .plane .name{font-weight:600}
+  .plane .key{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-top:4px}
+  .plane .desc{color:var(--ink-2);font-size:15px}
+  .diff{margin-top:22px;padding:20px 24px;border:1px solid var(--accent);border-radius:var(--radius);
+    background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+  .diff strong{color:var(--accent)}
+  @media(max-width:620px){.plane{grid-template-columns:1fr;gap:6px}}
+
+  /* chain flow */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .node{flex:1;min-width:150px;border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px;background:var(--panel)}
+  .node .t{font-family:var(--mono);font-size:12px;color:var(--accent)}
+  .node h4{margin:8px 0 4px;font-size:15px}
+  .node p{margin:0;font-size:13.5px;color:var(--ink-2)}
+  .arrow{align-self:center;color:var(--ink-2);padding:0 14px;font-family:var(--mono)}
+  @media(max-width:720px){.arrow{transform:rotate(90deg);padding:8px 0}.node{min-width:100%}}
+
+  /* roadmap timeline */
+  .road{display:grid;gap:0}
+  .phase{display:grid;grid-template-columns:70px 1fr;gap:20px;padding:20px 0;border-top:1px solid var(--border)}
+  .phase:first-child{border-top:none}
+  .phase .p{font-family:var(--mono);font-weight:600;color:var(--accent)}
+  .phase h4{margin:0 0 4px;font-size:16px}
+  .phase p{margin:0;color:var(--ink-2);font-size:14.5px}
+  .phase.done .p::after{content:" shipped";display:block;font-size:11px;color:var(--ink-2);font-weight:400;text-transform:uppercase;letter-spacing:.08em}
+
+  /* footer */
+  footer{border-top:1px solid var(--border);padding:56px 0 72px;text-align:center}
+  footer h2{margin-bottom:18px}
+  .foot-meta{margin-top:34px;color:var(--ink-2);font-size:13px}
+  .foot-meta code{background:var(--bg-2);padding:2px 7px;border-radius:6px;border:1px solid var(--border)}
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M48 8 L82 28 L82 68 L48 88 L14 68 L14 28 Z" stroke="var(--accent)" stroke-width="5" stroke-linejoin="round"/>
+        <path d="M48 24 L68 36 L68 60 L48 72 L28 60 L28 36 Z" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round" fill="var(--accent)" fill-opacity="0.1"/>
+        <circle cx="48" cy="48" r="8" fill="var(--accent)"/>
+      </svg>
+      Skill Cell
+    </a>
+    <div class="navlinks">
+      <a href="#inversion">Inversion</a>
+      <a href="#anatomy">Anatomy</a>
+      <a href="#planes">Model planes</a>
+      <a href="#roadmap">Roadmap</a>
+      <a class="btn btn-ghost" href="https://github.com/boredinnyc/skillcell">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header id="top">
+  <div class="wrap hero">
+    <div>
+      <p class="eyebrow">Send agents to the work</p>
+      <h1>The cell <span class="em">is</span> the skill.</h1>
+      <p class="lede">Every skill becomes a mono-scoped, weight-pinned workspace. Agents are dispatched into it, then chained Kubernetes-style.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#anatomy">See how a cell works</a>
+        <a class="btn btn-ghost" href="https://github.com/boredinnyc/skillcell">Read the code</a>
+      </div>
+    </div>
+    <div class="terminal" aria-label="skillcell CLI output">
+      <div class="term-bar"><i></i><i></i><i></i></div>
+      <pre><span class="term-cmd">$ skillcell doctor</span>
+STATUS=ready
+RUNTIME=local
+PLANES=offline,frontier,system,byok
+OFFLINE_LOOP=ready
+
+<span class="term-cmd">$ skillcell run cell.yaml --goal "triage firmware"</span>
+<span class="term-dim">cell=firmware-triage route=firmware-pentest</span>
+  align    done
+  select   done     firmware-pentest
+  gate     done     scope satisfied
+  act      skipped  no model configured (offline)
+  record   done
+  stop     done     decisionBoundary</pre>
+    </div>
+  </div>
+</header>
+
+<section id="inversion">
+  <div class="wrap">
+    <h2>Stop loading skills into one agent.</h2>
+    <p class="sub">The current workflow stacks every skill into a shared session: context bloats, model styles clash, runs drift. Skill Cell makes the skill the place, not the payload.</p>
+    <div class="compare">
+      <div class="col now reveal">
+        <h3>Today: skills into agent</h3>
+        <ul>
+          <li>Skill loads into a shared session</li>
+          <li>One context holds everything</li>
+          <li>Prompt-level behavior, drifts run to run</li>
+          <li>Personality clash across stacked skills</li>
+          <li>User chains steps by hand</li>
+        </ul>
+      </div>
+      <div class="col new reveal">
+        <h3>Skill Cell: agent into cell</h3>
+        <ul>
+          <li>The skill is a workspace; the agent travels to it</li>
+          <li>Each cell holds only its own scope</li>
+          <li>Adapter plus pinned decode, deterministic</li>
+          <li>One adapter per cell, no cross-talk</li>
+          <li>Declarative DAG, reconciled by an orchestrator</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="anatomy">
+  <div class="wrap">
+    <h2>Anatomy of a cell</h2>
+    <p class="sub">A cell is a repo plus a manifest. It declares everything one skill needs to run end to end, and nothing outside its scope is reachable from inside it.</p>
+    <div class="bento">
+      <div class="cell big reveal">
+        <div class="k">contract</div>
+        <h4>Typed in, typed out, gated</h4>
+        <p>Declared inputs and output artifacts, plus an eval gate that must pass before the cell reports done.</p>
+      </div>
+      <div class="cell reg reveal">
+        <div class="k">tools</div>
+        <h4>Exact allowlist</h4>
+        <p>Only the tools the cell names are reachable.</p>
+      </div>
+      <div class="cell reg reveal">
+        <div class="k">lsp</div>
+        <h4>Servers in-cell</h4>
+        <p>Symbol-accurate editing provisioned per cell.</p>
+      </div>
+      <div class="cell reg reveal">
+        <div class="k">loop</div>
+        <h4>Plan, act, verify</h4>
+        <p>Seven stages with an iteration cap and stop boundary.</p>
+      </div>
+      <div class="cell reg reveal">
+        <div class="k">runtime</div>
+        <h4>Local or container</h4>
+        <p>Git worktree, or an OCI image from a devcontainer spec. Same manifest.</p>
+      </div>
+      <div class="cell wide reveal">
+        <div class="k">model</div>
+        <h4>A pinned base plus an optional LoRA adapter</h4>
+        <p>Temperature zero, fixed seed, hashed weights. The backend is transformed into the skill instead of prompted with it, so runs are reproducible and free of cross-skill personality clash.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="planes">
+  <div class="wrap">
+    <h2>Three model planes, one interface</h2>
+    <p class="sub">Keys come from the environment, never the manifest. A cell picks its plane; the agent adopts it on entry and leaks nothing on exit.</p>
+    <div class="planes">
+      <div class="plane reveal">
+        <div><div class="name">Frontier</div><div class="key">ANTHROPIC_API_KEY</div></div>
+        <div class="desc">Hosted frontier model. Reach for it when no adapter exists yet; the cell still gets determinism from its contract and eval gate.</div>
+      </div>
+      <div class="plane reveal">
+        <div><div class="name">System-native</div><div class="key">local endpoint</div></div>
+        <div class="desc">A model served on this machine over MLX or Ollama. No key required, nothing leaves the box.</div>
+      </div>
+      <div class="plane reveal">
+        <div><div class="name">BYOK</div><div class="key">SKILLCELL_BYOK_KEY</div></div>
+        <div class="desc">Bring your own key for any OpenAI-compatible provider and base URL.</div>
+      </div>
+    </div>
+    <div class="diff reveal">
+      <strong>The differentiator.</strong> Everyone containerizes the runtime. Skill Cell is the layer that pins the skill itself to its own adapter, so behavior is deterministic and reusable, not just sandboxed.
+    </div>
+  </div>
+</section>
+
+<section id="chain">
+  <div class="wrap">
+    <h2>Chain cells like a control plane</h2>
+    <p class="sub">A Chain is a DAG of cells with typed artifact edges. The orchestrator provisions each cell, dispatches a subagent in, and passes artifacts on only after the eval gate clears. Local mode now, Kubernetes mode later, same manifests.</p>
+    <div class="flow">
+      <div class="node reveal"><div class="t">cell 1</div><h4>Triage</h4><p>Extracts findings from the firmware image.</p></div>
+      <div class="arrow">-&gt;</div>
+      <div class="node reveal"><div class="t">cell 2</div><h4>Correlate</h4><p>Maps findings to known CVEs.</p></div>
+      <div class="arrow">-&gt;</div>
+      <div class="node reveal"><div class="t">cell 3</div><h4>Report</h4><p>Renders the operator-facing record.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="wrap">
+    <h2>Roadmap</h2>
+    <p class="sub">Local runner shipped first. Every later phase reuses the same manifest so nothing is rewritten to graduate to a cluster.</p>
+    <div class="road">
+      <div class="phase done reveal"><div class="p">0</div><div><h4>Local cell runner</h4><p>Manifest, seven-stage loop, eval gate, three model planes. TDD'd, security-scanned, packaged.</p></div></div>
+      <div class="phase reveal"><div class="p">1</div><div><h4>Containerized cells</h4><p>Devcontainer build; a cell passes identically local and in a container.</p></div></div>
+      <div class="phase reveal"><div class="p">2</div><div><h4>Adapter plane</h4><p>Trace capture, LoRA training, adapter registry, adoption on dispatch.</p></div></div>
+      <div class="phase reveal"><div class="p">3</div><div><h4>Orchestrator and chains</h4><p>Reconciler in Go, DAG scheduling, retry and fallback policy.</p></div></div>
+      <div class="phase reveal"><div class="p">4</div><div><h4>Kube mode</h4><p>Manifests as real CRDs, cells as jobs, multi-LoRA serving at scale.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <h2>Build a cell.</h2>
+    <div class="cta-row" style="justify-content:center">
+      <a class="btn btn-primary" href="https://github.com/boredinnyc/skillcell">Get started on GitHub</a>
+    </div>
+    <p class="foot-meta">Open core. Apache-2.0 everywhere outside <code>ee/</code>; the <code>ee/</code> tree is a separate commercial license. Anything needed to run one machine's cells stays open source.</p>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, {threshold:0.15});
+    document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  })();
+</script>
+</body>
+</html>

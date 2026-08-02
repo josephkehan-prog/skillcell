@@ -1,0 +1,11 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Skill Cell logo">
+  <title>Skill Cell</title>
+  <!-- Cell membrane: a hexagon = biological cell + honeycomb schedulable unit -->
+  <path d="M48 8 L82 28 L82 68 L48 88 L14 68 L14 28 Z"
+        stroke="#2fbf71" stroke-width="4" stroke-linejoin="round" fill="none"/>
+  <!-- Inner scope: the one skill the cell owns, held apart from everything else -->
+  <path d="M48 24 L68 36 L68 60 L48 72 L28 60 L28 36 Z"
+        stroke="#2fbf71" stroke-width="2" stroke-linejoin="round" fill="#2fbf71" fill-opacity="0.08"/>
+  <!-- Nucleus: the pinned adapter -->
+  <circle cx="48" cy="48" r="8" fill="#2fbf71"/>
+</svg>

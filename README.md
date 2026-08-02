@@ -1,6 +1,16 @@
-# skillcell
+<p align="center">
+  <img src="assets/logo.svg" width="88" height="88" alt="Skill Cell logo">
+</p>
 
-**The cell is the skill — weight-pinned, reusable, agents dispatched into it.**
+<h1 align="center">Skill Cell</h1>
+
+<p align="center"><strong>The cell is the skill</strong> - weight-pinned, reusable, agents dispatched into it.</p>
+
+<p align="center">
+  <code>pip install skillcell</code> &nbsp;·&nbsp; <a href="https://boredinnyc.github.io/skillcell/">Landing page</a> &nbsp;·&nbsp; Apache-2.0 open core
+</p>
+
+---
 
 Every serious agent platform now containerizes the *runtime* (OpenHands, Devin,
 Codex Cloud, Claude Code cloud, Copilot all run a sandbox per task). skillcell's
