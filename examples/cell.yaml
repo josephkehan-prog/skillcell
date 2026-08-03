@@ -1,4 +1,12 @@
-# A single mono-scoped cell: one skill, completed end to end.
+# ASPIRATIONAL — not a starting point. Kept to show where the design is headed.
+#
+# This cell fails all three trainability criteria (see README, "Which cells are
+# trainable"): the output is a judgment call, nothing verifies it mechanically,
+# and a 7B's base pass rate on firmware triage is ~0, so rejection sampling has
+# nothing to keep. It is also why the authorization gate exists.
+#
+# Start from examples/wordsmith.yaml instead — procedural, mechanically
+# verifiable, non-zero base pass rate.
 apiVersion: skillcell.dev/v1alpha1
 kind: Cell
 metadata:

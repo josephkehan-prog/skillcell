@@ -8,6 +8,9 @@ loop runnable offline.
 from __future__ import annotations
 
 _RULES: tuple[tuple[str, str], ...] = (
+    ("tighten", "wordsmith"),
+    ("prose", "wordsmith"),
+    ("rewrite", "wordsmith"),
     ("firmware", "firmware-pentest"),
     ("apk", "apk-analysis"),
     ("burp", "burp-mcp"),

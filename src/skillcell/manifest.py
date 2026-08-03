@@ -13,9 +13,20 @@ from typing import Any
 
 import yaml
 
+from .verify import Check, VerifyError, validate_check
+
 API_VERSION = "skillcell.dev/v1alpha1"
 RUNTIMES = ("local", "container")
-PLANES = ("offline", "frontier", "system", "byok")
+PLANES = ("offline", "local", "frontier", "system", "byok")
+
+# YAML check key -> Check.kind. camelCase in the manifest, snake_case in code.
+CHECK_KEYS: dict[str, str] = {
+    "command": "command",
+    "preserves": "preserves",
+    "require": "require",
+    "forbid": "forbid",
+    "maxEditRatio": "max_edit_ratio",
+}
 
 
 class ManifestError(ValueError):
@@ -45,6 +56,22 @@ class ContainerCfg:
 
 
 @dataclass(frozen=True)
+class EvalSpec:
+    """The cell's gate: what must hold before it may report done."""
+
+    checks: tuple[Check, ...] = ()
+    coverage_floor: float | None = None
+
+
+@dataclass(frozen=True)
+class LoopSpec:
+    """How many act/verify attempts the cell may spend reaching a passing gate."""
+
+    max_attempts: int = 1
+    stop_on: str = "decisionBoundary"
+
+
+@dataclass(frozen=True)
 class Cell:
     name: str
     scope: str
@@ -55,6 +82,8 @@ class Cell:
     tools: tuple[str, ...] = ()
     network: str = "deny"
     container: ContainerCfg | None = None
+    eval: EvalSpec = field(default_factory=EvalSpec)
+    loop: LoopSpec = field(default_factory=LoopSpec)
 
 
 @dataclass(frozen=True)
@@ -101,6 +130,68 @@ def _parse_model(raw: dict[str, Any]) -> ModelSpec:
         base_url=raw.get("base_url"),
         adapter=raw.get("adapter"),
     )
+
+
+def _parse_check(raw: Any) -> Check:
+    if not isinstance(raw, dict) or len(raw) != 1:
+        raise ManifestError("each eval check must be a mapping with exactly one key")
+    key, value = next(iter(raw.items()))
+    kind = CHECK_KEYS.get(str(key))
+    if kind is None:
+        raise ManifestError(f"unknown check '{key}'; expected one of {tuple(CHECK_KEYS)}")
+
+    if kind == "max_edit_ratio":
+        try:
+            ratio = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ManifestError(f"maxEditRatio must be a number, got {value!r}") from exc
+        if not 0.0 <= ratio <= 1.0:
+            raise ManifestError(f"maxEditRatio must be between 0 and 1, got {ratio}")
+        check = Check(kind, ratio)
+    else:
+        check = Check(kind, str(value))
+
+    # Validate now so `skillcell validate` fails on a broken gate, rather than
+    # the run that depends on it discovering the problem halfway through.
+    try:
+        validate_check(check)
+    except VerifyError as exc:
+        raise ManifestError(str(exc)) from exc
+    return check
+
+
+def _parse_eval(raw: Any) -> EvalSpec:
+    if not raw:
+        return EvalSpec()
+    if not isinstance(raw, dict):
+        raise ManifestError("spec.contract.eval must be a mapping")
+
+    checks = [_parse_check(entry) for entry in raw.get("checks") or ()]
+
+    # Legacy single-script form: `eval.gate: ./eval/run.sh` is one command check.
+    gate = raw.get("gate")
+    if gate:
+        checks.insert(0, _parse_check({"command": gate}))
+
+    floor_raw = raw.get("coverageFloor")
+    floor = None if floor_raw is None else float(floor_raw)
+    return EvalSpec(checks=tuple(checks), coverage_floor=floor)
+
+
+def _parse_loop(raw: Any) -> LoopSpec:
+    if not raw:
+        return LoopSpec()
+    if not isinstance(raw, dict):
+        raise ManifestError("spec.loop must be a mapping")
+    try:
+        attempts = int(raw.get("maxAttempts", 1))
+    except (TypeError, ValueError) as exc:
+        raise ManifestError(
+            f"maxAttempts must be an integer, got {raw.get('maxAttempts')!r}"
+        ) from exc
+    if attempts < 1:
+        raise ManifestError(f"maxAttempts must be >= 1, got {attempts}")
+    return LoopSpec(max_attempts=attempts, stop_on=str(raw.get("stopOn", "decisionBoundary")))
 
 
 def _first_doc(path: str | Path) -> dict[str, Any]:
@@ -155,6 +246,8 @@ def _cell_from_doc(doc: dict[str, Any]) -> Cell:
         tools=tuple(spec.get("tools") or ()),
         network=str(spec.get("network", "deny")),
         container=container,
+        eval=_parse_eval(contract.get("eval")),
+        loop=_parse_loop(spec.get("loop")),
     )
 
 

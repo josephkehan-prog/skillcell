@@ -1,0 +1,91 @@
+# The reference cell: a small local model, a gate it must satisfy, and a
+# contract narrow enough that a LoRA can actually learn it.
+#
+# Why this cell and not the firmware one: a cell is only trainable if it is
+#   1. procedural        — shapeable by an adapter, not dependent on judgment
+#                          the base model does not have;
+#   2. mechanically verifiable — the gate decides pass/fail with no model and
+#                          no human in the loop;
+#   3. non-zero base pass rate — the stock model succeeds sometimes under
+#                          sampling, or rejection sampling has nothing to keep.
+#
+# Prose tightening satisfies all three. Firmware triage satisfies none of them
+# (see cell.yaml, which is kept as an aspiration, not a starting point).
+#
+#   uv run skillcell run examples/wordsmith.yaml \
+#     --goal "tighten this changelog entry" --source NOTES.md \
+#     --traces .skillcell/traces.jsonl
+#
+# Runs offline out of the box: with no server on the endpoint the model plane
+# falls back to its echo transport, and the gate still executes for real.
+apiVersion: skillcell.dev/v1alpha1
+kind: Cell
+metadata:
+  name: wordsmith
+  labels:
+    domain: writing
+spec:
+  scope: "Tighten prose without changing what it says."
+
+  runtime: local
+
+  contract:
+    inputs:
+      - name: draft
+        type: markdown
+    outputs:
+      - name: tightened
+        type: markdown
+
+    # The gate does three jobs with one artifact: it decides whether this run
+    # may report done, it filters which attempts become training data, and it
+    # is the reward signal an RL pass would optimize.
+    eval:
+      checks:
+        # --- conformance: house rules, mechanically checkable -------------
+        - forbid: '\b(?:very|really|quite|basically|actually)\b'
+        - forbid: '\b(?:leverage|utilize|synergy|robust solution)\b'
+        - forbid: '\bTODO\b'
+
+        # --- preservation: the failure mode determinism would otherwise
+        #     reproduce forever, behind a green gate --------------------------
+        - preserves: numbers      # every figure survives the rewrite
+        - preserves: urls
+        - preserves: acronyms
+        - preserves: negations    # a flipped negation inverts the meaning
+
+        # --- bounded rewrite: stop the model "passing" by discarding the
+        #     input and writing something new that happens to conform --------
+        - maxEditRatio: 0.55
+
+        # A command check runs any script that exits 0/non-zero, so a prose
+        # linter drops straight in once it is installed in the cell:
+        # - command: ./eval/vale.sh
+
+  # Reliability is an inference-time property. The cell retries against its own
+  # gate — carrying each failure reason into the next prompt — and reports
+  # blocked rather than done if it never satisfies the contract. This is how a
+  # 7B reaches the guarantee a much larger model would: more attempts, not
+  # more parameters.
+  loop:
+    maxAttempts: 4
+    stopOn: gatePassed
+
+  tools:
+    - read_file
+    - write_file
+  network: deny
+
+  model:
+    plane: local                  # no key, no egress, single-tenant, batch 1 —
+                                  # the only setting where bit-reproducibility
+                                  # is actually on the table
+    base: qwen2.5-7b-instruct
+    # adapter: wordsmith@v1       # uncomment once an adapter is promoted;
+                                  # until then the base model runs prompted and
+                                  # the gate still holds the contract
+    endpoint: http://127.0.0.1:11434/v1
+    decode:
+      temperature: 0.0            # a *serving* invariant. Generating training
+      seed: 1                     # data samples hot on purpose; only the
+                                  # served path is pinned.
