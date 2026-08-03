@@ -19,7 +19,12 @@ async def test_app_lists_manifests_from_directory():
     async with app.run_test() as pilot:
         listing = pilot.app.query_one("#manifest-list", ListView)
         names = {item.name for item in listing.children}
-        assert names == {"cell.yaml", "chain.yaml", "refactor-audit-chain.yaml"}
+        assert names == {
+            "wordsmith.yaml",
+            "cell.yaml",
+            "chain.yaml",
+            "refactor-audit-chain.yaml",
+        }
 
 
 async def test_selecting_manifest_shows_validation_in_detail():

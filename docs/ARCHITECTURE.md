@@ -54,10 +54,31 @@ Same manifest, two runtimes:
   container entrypoint. This is the unit the orchestrator schedules — on the
   local Docker/Apple-container runtime first, on real Kubernetes later.
 
-## 5. Adapter plane (reproducible per-cell models)
+## 5. Adapter plane (capable per-cell models)
 
 Goal: the backend model is *transformed into the skill* rather than prompted
 with it, eliminating cross-skill personality clash and run-to-run drift.
+
+**What the adapter is and is not for.** Determinism comes from *serving*
+(single-tenant, batch size 1, pinned seed) and is available from a stock model
+with no adapter at all. The adapter supplies *capability*: it is what makes a
+small model good enough that the reproducible serving path is worth standing
+on. The two are independent, and the causal chain runs:
+
+> bit-reproducible ⇒ single-tenant local decode ⇒ small model ⇒ needs an
+> adapter to be useful.
+
+A LoRA reliably makes a small model *assume a procedure* — a format, a fixed
+tool sequence, a house style. It does not raise raw capability or add
+knowledge. Cells whose skill needs judgment the base lacks are not adapter
+candidates, no matter how much training data they accumulate.
+
+**Determinism is not correctness.** Same input → same output includes the same
+*wrong* output, every time. Reliability is an inference-time property supplied
+by the gate (§3, `contract.eval`): the loop retries against the contract and
+reports `blocked` rather than `done` if it never passes. That is what lets a
+small model reach a large model's guarantee — more attempts, not more
+parameters — and it works today with no adapter at all.
 
 - **Per-cell adapter.** Each cell may reference a LoRA adapter trained on
   that cell's skill traces (successful loop transcripts, curated
@@ -164,13 +185,41 @@ gluing these, not a rebuild of any of them:
 
 ## 9. Roadmap
 
+Reordered so the load-bearing bet is tested **before** more infrastructure is
+built on top of it. The original plan reached the adapter experiment at phase 2,
+after the container runtime — which meant the one unproven claim was also the
+last thing to be checked.
+
 | Phase | Deliverable | Exit criterion |
 | --- | --- | --- |
-| 0 | Spec + local runner: `Cell` manifest, worktree provisioner, loop runner, eval gate | One existing skill (from reverse-skill) completes end to end inside a local cell, deterministically routed and recorded |
-| 1 | Containerized cells: devcontainer build, OCI image per cell, same manifest | Same cell passes identically in local and container runtimes |
-| 2 | Adapter plane: trace capture, MLX-LM LoRA training job, adapter registry, adoption on dispatch | A cell with an adapter beats the prompted baseline on its own eval gate |
-| 3 | Orchestrator + chains: reconciler in Go, `Chain`/`Run` kinds, DAG scheduling, retry/fallback policy | A three-cell chain completes with one induced failure recovered by policy |
-| 4 | Kube mode: manifests as real CRDs, controller deployment, cells as jobs/pods, vLLM multi-LoRA serving | The phase-3 chain runs unmodified on a k8s cluster |
+| 0 ✅ | Spec + local runner: `Cell` manifest, model planes, loop runner | A cell completes end to end locally, deterministically routed and recorded |
+| 1 ✅ | Gate + reliability: composable verifier, parsed `contract.eval`, gate-driven retry, trace capture, SFT export, container argv builders | A cell reports `done` only on a passing gate, `blocked` otherwise; every attempt is traced; identical runs write byte-identical logs |
+| 2 | **The experiment.** One narrow cell, ~300 gate-passing traces collected by rejection sampling from the *local* base, one MLX-LM LoRA, one fixed eval set | **The falsifiable step.** Adapted 7B beats the *prompted 7B* on first-attempt pass rate. If it does not, the adapter thesis is dead and nothing below matters |
+| 3 | Adapter registry + promotion: versioned adapters, promotion gated on the cell's own eval set, adoption on dispatch | An adapter is promoted only by beating the incumbent; rollback is one manifest edit |
+| 4 | Orchestrator + chains: reconciler, `Chain`/`Run` kinds, DAG scheduling, retry/fallback policy | A three-cell chain completes with one induced failure recovered by policy |
+| 5 | Scale-out, *only if demand exists*: kube CRDs, vLLM multi-LoRA, batch-invariant kernels | The phase-4 chain runs unmodified on a cluster |
+
+Phase 2 is the whole project. Its cheapest honest form is three numbers on one
+eval set — adapted 7B, prompted 7B, prompted frontier — and it is deliberately
+scheduled before any further platform work. Phase 5 is explicitly conditional:
+a Go control plane and k8s CRDs are a response to fleet-scale demand, not a
+prerequisite for a single operator, and building them ahead of that demand is
+how this project would waste a year.
+
+### Bootstrapping with no frontier teacher
+
+Rejection sampling needs a generator strong enough to sometimes succeed, and
+the offline-first constraint rules out a hosted teacher. Three viable paths,
+in the order they should be tried:
+
+1. **Programmatic ground truth** — for mechanical tasks, generate verified
+   (input, output) pairs with no model at all. Cheapest where it applies.
+2. **A larger *open* teacher, still local** — "no frontier model" is not "no
+   teacher". A 30–70B quantized model on the same workstation can distil into
+   a 7B. Slow, offline, no keys.
+3. **Self-taught (STaR)** — sample the cell's own base hot, keep gate-passing
+   traces, train, repeat. Requires the base's pass rate to be above zero;
+   if pass@1 is 0%, this path never ignites.
 
 ## 10. Licensing boundary
 

@@ -1,8 +1,18 @@
-"""The model plane: three backends behind one interface.
+"""The model plane: one interface, several backends — local first.
 
-- FrontierBackend    hosted frontier model (Claude), key from ANTHROPIC_API_KEY
-- SystemNativeBackend local model served on this machine (MLX / Ollama endpoint)
-- BYOKBackend        bring-your-own-key, any OpenAI-compatible provider
+- LocalBackend    a small model served on this machine (MLX-LM / Ollama /
+                  llama.cpp), optionally with a per-cell LoRA adapter. **The
+                  canonical plane**: single-tenant, batch size 1, no key, no
+                  egress — the only setting where bit-reproducibility is
+                  actually available. ``system`` is a deprecated alias.
+- FrontierBackend hosted frontier model, key from ANTHROPIC_API_KEY. A
+                  fallback for cells with no promoted adapter yet.
+- BYOKBackend     bring-your-own-key, any OpenAI-compatible provider.
+
+Decode temperature is pinned at serve time. ``complete(prompt,
+temperature=...)`` overrides it, because temperature 0 is a *serving*
+invariant, not a training one: rejection sampling needs diverse attempts to
+have anything to filter, and the adapter trained on them is then served cold.
 
 Each backend takes an injectable ``transport`` so the loop is testable and
 deterministic without a live network. Real transports are attached at the
@@ -19,17 +29,24 @@ from .manifest import Decode, ModelSpec
 # A transport turns a prompt + params into completion text.
 Transport = Callable[..., str]
 
+# Ollama's OpenAI-compatible port; MLX-LM and llama.cpp servers speak the same
+# shape on their own ports, so a cell only ever overrides the endpoint.
+DEFAULT_LOCAL_ENDPOINT = "http://127.0.0.1:11434/v1"
+
 
 class BackendError(RuntimeError):
     """Raised when a backend is misconfigured or cannot serve."""
 
 
 class ModelBackend(Protocol):
-    def complete(self, prompt: str) -> str: ...
+    def complete(self, prompt: str, *, temperature: float | None = None) -> str: ...
 
 
-def _decode_params(decode: Decode) -> dict[str, object]:
-    return {"temperature": decode.temperature, "seed": decode.seed}
+def _decode_params(decode: Decode, temperature: float | None = None) -> dict[str, object]:
+    return {
+        "temperature": decode.temperature if temperature is None else temperature,
+        "seed": decode.seed,
+    }
 
 
 def _echo_transport(*, prompt: str, params: Mapping[str, object]) -> str:
@@ -55,30 +72,49 @@ class FrontierBackend:
         self._key = api_key
         self._transport = transport or _echo_transport
 
-    def complete(self, prompt: str) -> str:
-        params = _decode_params(self._decode) | {"model": self._base, "api_key": self._key}
+    def complete(self, prompt: str, *, temperature: float | None = None) -> str:
+        params = _decode_params(self._decode, temperature) | {
+            "model": self._base,
+            "api_key": self._key,
+        }
         return self._transport(prompt=prompt, params=params)
 
 
-class SystemNativeBackend:
+class LocalBackend:
+    """A small model served on this machine, optionally LoRA-adapted.
+
+    No key is read here on any path: a cell on the local plane behaves the
+    same whether or not the environment holds provider credentials.
+    """
+
     def __init__(
         self,
         *,
         base: str,
         decode: Decode,
         endpoint: str,
+        adapter: str | None = None,
         transport: Transport | None = None,
     ) -> None:
         if not endpoint:
-            raise BackendError("system plane requires an endpoint")
+            raise BackendError("local plane requires an endpoint")
         self._base = base
         self._decode = decode
         self._endpoint = endpoint
+        self._adapter = adapter
         self._transport = transport or _echo_transport
 
-    def complete(self, prompt: str) -> str:
-        params = _decode_params(self._decode) | {"model": self._base, "endpoint": self._endpoint}
+    def complete(self, prompt: str, *, temperature: float | None = None) -> str:
+        params = _decode_params(self._decode, temperature) | {
+            "model": self._base,
+            "endpoint": self._endpoint,
+            "adapter": self._adapter,
+        }
         return self._transport(prompt=prompt, params=params)
+
+
+# Deprecated alias: `plane: system` was the original name for the local plane.
+SystemNativeBackend = LocalBackend
 
 
 class BYOKBackend:
@@ -101,8 +137,8 @@ class BYOKBackend:
         self._base_url = base_url
         self._transport = transport or _echo_transport
 
-    def complete(self, prompt: str) -> str:
-        params = _decode_params(self._decode) | {
+    def complete(self, prompt: str, *, temperature: float | None = None) -> str:
+        params = _decode_params(self._decode, temperature) | {
             "model": self._base,
             "provider": self._provider,
             "api_key": self._key,
@@ -120,9 +156,9 @@ def resolve_backend(
     """Build the backend for a cell's model spec, or None for offline.
 
     Keys are read from the environment by convention, never from the manifest:
-      frontier -> ANTHROPIC_API_KEY
-      byok     -> SKILLCELL_BYOK_KEY
-      system   -> no key required
+      frontier      -> ANTHROPIC_API_KEY
+      byok          -> SKILLCELL_BYOK_KEY
+      local/system  -> no key required
     """
     if spec is None or spec.plane == "offline":
         return None
@@ -133,10 +169,19 @@ def resolve_backend(
             raise BackendError("frontier plane: ANTHROPIC_API_KEY not set")
         return FrontierBackend(base=spec.base, decode=spec.decode, api_key=key, transport=transport)
 
-    if spec.plane == "system":
-        endpoint = spec.endpoint or env.get("SKILLCELL_SYSTEM_ENDPOINT", "")
-        return SystemNativeBackend(
-            base=spec.base, decode=spec.decode, endpoint=endpoint, transport=transport
+    if spec.plane in ("local", "system"):
+        endpoint = (
+            spec.endpoint
+            or env.get("SKILLCELL_LOCAL_ENDPOINT")
+            or env.get("SKILLCELL_SYSTEM_ENDPOINT")
+            or DEFAULT_LOCAL_ENDPOINT
+        )
+        return LocalBackend(
+            base=spec.base,
+            decode=spec.decode,
+            endpoint=endpoint,
+            adapter=spec.adapter,
+            transport=transport,
         )
 
     if spec.plane == "byok":
